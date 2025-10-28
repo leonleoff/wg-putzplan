@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>WG Putzplan</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin: 0.5em 0;
+    }
+
+    .plan-liste {
+      margin: 1em 0;
+      padding: 1em;
+      background: #f9f9f9;
+      border-radius: 6px;
+    }
+
+    .plan-liste strong {
+      display: inline-block;
+      margin-bottom: 0.5em;
+    }
+
+    .plan-eintrag {
+      margin: 0.2em 0;
+      line-height: 1.5;
+    }
+
+    .week-picker {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 2em;
+    }
+
+    footer {
+      margin-top: 3em;
+      font-size: 0.9em;
+      color: #666;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>WG Putzplan</h1>
+
+  <h2>Aktuelle Woche</h2>
+  <div id="aktuelle-woche" class="plan-liste"></div>
+
+  <div class="week-picker">
+    <h2>Woche auswählen</h2>
+    <input type="week" id="weekInput" />
+    <div id="ausgewaehlte-woche" class="plan-liste" style="display: none;"></div>
+  </div>
+
+  <footer>
+    <p>Ein Projekt von Leon Layer – 
+      <a href="/putzplan/impressum.html">Impressum</a>
+    </p>
+  </footer>
+
+  <script>
+    /*
+      WG Putzplan - Funktionen
+    */
+
+    // Aufgaben-Array (Index = 0..3)
+    const aufgaben = ["🏡 Altglas usw.", "🚽 Klo", "☀️ Frei", "🥘 Küche"];
+
+    // Personen mit Offset
+    // KW + offset mod 4
+    const personen = [
+      { name: "Leon", offset: 0 },
+      { name: "Marc", offset: 1 },
+      { name: "Lu",   offset: 2 },
+      { name: "Noah", offset: 3 }
+    ];
+
+    /**
+     * Berechnet den Kalenderwochenplan für eine gegebene KW.
+     */
+    function berechnePlan(kw) {
+      return personen.map(p => {
+        const aufgabenIndex = (kw + p.offset) % 4;
+        return {
+          name: p.name,
+          aufgabe: aufgaben[aufgabenIndex]
+        };
+      });
+    }
+
+    /**
+     * Gibt HTML aus, z.B.:
+     * <strong>Woche (KW 15):</strong>
+     * <div>Leon: Frei</div>
+     * ...
+     */
+    function erzeugePlanHtml(kw, titel = "Woche") {
+      const plan = berechnePlan(kw);
+      let html = `<strong>${titel} (KW ${kw})</strong>`;
+      plan.forEach(e => {
+        html += `<div class="plan-eintrag">${e.name}: ${e.aufgabe}</div>`;
+      });
+      return html;
+    }
+
+    /**
+     * Berechnet für ein Date-Objekt die KW.
+     * (Einfache Variante nach ISO-ähnlicher Methode)
+     */
+    function getKalenderwoche(datum) {
+      // Montag als Start der Woche definieren
+      const tempDatum = new Date(Date.UTC(datum.getFullYear(), datum.getMonth(), datum.getDate()));
+      // tempDatum auf nächsten Donnerstag verschieben (gem. ISO 8601)
+      const tagNum = tempDatum.getUTCDay() || 7; // Sonntag = 7
+      tempDatum.setUTCDate(tempDatum.getUTCDate() + 4 - tagNum);
+
+      // 1. Januar dieses (verschobenen) Jahres
+      const jahrBeginn = new Date(Date.UTC(tempDatum.getUTCFullYear(), 0, 1));
+      // Anzahl Tage zwischen Jahresbeginn und tempDatum
+      const tageSeitJahresBeginn = Math.round((tempDatum - jahrBeginn) / 86400000);
+
+      // KW = Tage/7 + 1
+      return Math.floor(tageSeitJahresBeginn / 7) + 1;
+    }
+
+    /**
+     * Zeigt die aktuelle KW an.
+     */
+    function zeigeAktuelleWoche() {
+      const heute = new Date();
+      const kwHeuer = getKalenderwoche(heute);
+
+      const container = document.getElementById("aktuelle-woche");
+      container.innerHTML = erzeugePlanHtml(kwHeuer, "Aktuelle Woche");
+    }
+
+    /**
+     * Event-Handler für das <input type="week">-Element
+     */
+    function zeigeAusgewaehlteWoche(event) {
+      const wocheEingabe = event.target.value; // z.B. "2025-W15"
+      if (!wocheEingabe) return;
+
+      // Aus year und week parsen (normales 'type=week'-Format)
+      const [year, w] = wocheEingabe.split("-W");
+      const yearNum = parseInt(year, 10);
+      const weekNum = parseInt(w, 10);
+
+      // Wir wollen genau die KW = weekNum. Da wir ISO 8601 teils
+      // annehmen, kann man das direkt übernehmen.
+      // Du könntest auch ein Datum bauen und getKalenderwoche() aufrufen,
+      // aber hier reicht uns weekNum direkt (da 'type=week' = ISO KW).
+
+      const container = document.getElementById("ausgewaehlte-woche");
+      container.innerHTML = erzeugePlanHtml(weekNum, `Ausgewählte Woche`);
+      container.style.display = "block";
+    }
+
+    /*
+      Initialisierung nach Seitenaufruf
+    */
+    window.addEventListener("DOMContentLoaded", () => {
+      // Zeige direkt die aktuelle Woche an
+      zeigeAktuelleWoche();
+      // Füge Event-Listener für <input type="week"> hinzu
+      document.getElementById("weekInput").addEventListener("change", zeigeAusgewaehlteWoche);
+    });
+  </script>
+</body>
+</html>
